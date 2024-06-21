@@ -6,7 +6,7 @@ LOG_FILE="logs/install.log"
 LIBRARIES_FILE="template/libraries.txt" # Nom du fichier contenant les librairies
 IMAGE_NAME="seatable/seatable-python-runner"
 NEW_IMAGE_TAG="LIBS"
-CONTAINER_NAME="libs"
+CONTAINER_NAME="ajout-libs"
 CONFIG_FILE="python-pipeline.yml" # Chemin du fichier de configuration à modifier
 ENV_FILE=".env"
 STACK_NAME="seatable" # Nom du service stack
@@ -53,6 +53,11 @@ install_seatable() {
     
     export $(grep -v '^#' $ENV_FILE | xargs) && envsubst < template/seatable-server-template.yml > seatable-server.yml
     export $(grep -v '^#' $ENV_FILE | xargs) && envsubst < template/python-pipeline-template.yml > python-pipeline.yml
+
+    sed -i "s/^SEATABLE_MYSQL_ROOT_PASSWORD=.*/SEATABLE_MYSQL_ROOT_PASSWORD='$(pwgen 40 1)'/" .env
+    sed -i "s/^PYTHON_SCHEDULER_AUTH_TOKEN=.*/PYTHON_SCHEDULER_AUTH_TOKEN='$(pwgen 40 1)'/" .env
+    sed -i "s/^SEATABLE_FAAS_AUTH_TOKEN=.*/SEATABLE_FAAS_AUTH_TOKEN='$(pwgen 40 1)'/" .env
+    
 
     docker-compose up -d
 
