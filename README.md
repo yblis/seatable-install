@@ -1,4 +1,4 @@
-# seatable-install
+# EN COURS
 
 ## Prérequis:
 
@@ -11,11 +11,18 @@ résultat commande:
 >Please check your inbox.
 >Your SeaTable Server license is waiting for you.
 
-Télécharger le fichier seatable-license.txt et le copier dans le dossier "template"
 
 ## Installation
+```
+git clone https://github.com/yblis/seatable-install.git && cd seatable-install
+```
+
+Télécharger le fichier seatable-license.txt reçu par email et le copier dans le dossier "template"
 
 Lancer l'installation avec cette commande:
 
 ```
-./
+./isntall.sh
+```
+
+
