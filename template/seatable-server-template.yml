@@ -1,0 +1,111 @@
+---
+services:
+  ${SEATABLE_POD}:
+    image: ${SEATABLE_IMAGE}
+    restart: unless-stopped
+    container_name: ${SEATABLE_POD}
+    volumes:
+      - "./seatable-server:/shared"
+      - type: bind
+        source: "./template/seatable-license.txt"
+        target: "/shared/seatable/seatable-license.txt"
+        read_only: true
+    environment:
+      - DB_HOST=${MARIADB_POD}
+      - DB_ROOT_PASSWD=${SEATABLE_MYSQL_ROOT_PASSWORD}
+      - SEATABLE_SERVER_HOSTNAME=${SEATABLE_SERVER_HOSTNAME}
+      - SEATABLE_SERVER_PROTOCOL=${SEATABLE_SERVER_PROTOCOL}
+      - SEATABLE_ADMIN_EMAIL=${SEATABLE_ADMIN_EMAIL}
+      - SEATABLE_ADMIN_PASSWORD=${SEATABLE_ADMIN_PASSWORD}
+      - TIME_ZONE=${TIME_ZONE}
+    depends_on:
+      - ${MARIADB_POD}
+      - ${MEMCACHED_POD}
+      - ${REDIS_POD}
+    networks:
+      - ${SEATABLE_NETWORKS}
+      - traefik_traefik
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.docker.network=traefik_traefik'
+      
+      # Middleware pour la redirection HTTP vers HTTPS
+      - 'traefik.http.middlewares.redirection.redirectScheme.scheme=https'
+      - 'traefik.http.middlewares.redirection.redirectScheme.permanent=true'
+      
+      # Configuration du service
+      - 'traefik.http.services.${SEATABLE_POD}_tls.loadbalancer.server.port=80'
+
+      # Routeur pour le trafic HTTP (redirigé vers HTTPS)
+      - 'traefik.http.routers.${SEATABLE_POD}_http.rule=Host(`${SEATABLE_SERVER_HOSTNAME}`)'
+      - 'traefik.http.routers.${SEATABLE_POD}_http.entrypoints=http'
+      - 'traefik.http.routers.${SEATABLE_POD}_http.middlewares=redirection'
+      
+      # Routeur pour le trafic HTTPS
+      - 'traefik.http.routers.${SEATABLE_POD}_tls.rule=Host(`${SEATABLE_SERVER_HOSTNAME}`)'
+      - 'traefik.http.routers.${SEATABLE_POD}_tls.entrypoints=https'
+      - 'traefik.http.routers.${SEATABLE_POD}_tls.tls.certresolver=webssl'
+      - 'traefik.http.routers.${SEATABLE_POD}_tls.tls=true'
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail http://localhost:8000 || exit 1"]
+      interval: 20s
+      retries: 3
+      start_period: 30s
+      timeout: 10s
+
+  ${MARIADB_POD}:
+    image: ${SEATABLE_DB_IMAGE}
+    restart: unless-stopped
+    container_name: ${MARIADB_POD}
+    environment:
+      - MYSQL_ROOT_PASSWORD=${SEATABLE_MYSQL_ROOT_PASSWORD}
+      - MYSQL_LOG_CONSOLE=true
+      - MARIADB_AUTO_UPGRADE=1
+    volumes:
+      - "./mariadb:/var/lib/mysql"
+    networks:
+      - ${SEATABLE_NETWORKS}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "/usr/local/bin/healthcheck.sh",
+          "--connect",
+          "--mariadbupgrade",
+          "--innodb_initialized",
+        ]
+      interval: 20s
+      retries: 3
+      start_period: 30s
+      timeout: 10s
+
+  ${MEMCACHED_POD}:
+    image: ${SEATABLE_MEMCACHED_IMAGE}
+    restart: unless-stopped
+    container_name: ${MEMCACHED_POD}
+    entrypoint: memcached -m 256
+    networks:
+      - ${SEATABLE_NETWORKS}
+    healthcheck:
+      test: ["CMD-SHELL", "timeout 2 bash -c '</dev/tcp/localhost/11211'"]
+      interval: 20s
+      retries: 3
+      timeout: 5s
+
+  ${REDIS_POD}:
+    image: ${SEATABLE_REDIS_IMAGE}
+    restart: unless-stopped
+    container_name: ${REDIS_POD}
+    networks:
+      - ${SEATABLE_NETWORKS}
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 20s
+      retries: 3
+      timeout: 5s
+
+networks:
+  ${SEATABLE_NETWORKS}:
+    name: ${SEATABLE_NETWORKS}
+  traefik_traefik:
+    external: true
